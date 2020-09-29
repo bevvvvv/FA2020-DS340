@@ -1,0 +1,112 @@
+---
+title: "Basic Time Series Analysis"
+author: "Joseph Sepich (jps6444)"
+date: "09/24/2020"
+output:
+  pdf_document:
+    number_sections: false
+---
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r}
+# read airline data
+airlines <- read.table('./airpassenger.txt')
+airlines <- airlines %>%
+  rename(year = V1, month = V2, count = V3) %>%
+  mutate(time = ymd(paste0(year, "-", month,"-01"))) %>%
+  arrange(time)
+airlines %>%
+  head()
+```
+
+```{r}
+airlines %>%
+  ggplot(aes(x = time, y = count)) +
+  geom_line() +
+  geom_smooth() +
+  ggtitle("Airline Passenger Count") +
+  xlab("Monthly Data") +
+  ylab("Number of Passengers")
+```
+
+# Moving Average
+
+```{r}
+sma <- function(x, n = 12){stats::filter(x, rep(1 / n, n), sides = 1)}
+ma_count <- sma(airlines$count)
+airlines %>%
+  ggplot(aes(x = time, y = count, color="count")) +
+  geom_line() +
+  geom_line(aes(y=ma_count, color="ma")) +
+  ggtitle("12 Month Moving Average") +
+  xlab("Monthly Data") +
+  ylab("Number of Passengers")
+```
+
+# Trendline
+
+```{r}
+model <- lm(count~time, data=airlines)
+summary(model)
+```
+
+```{r}
+count_pred <- predict(model, data.frame(time=airlines$time))
+airlines %>%
+  ggplot(aes(x = time, y = count, color="count")) +
+  geom_line() +
+  geom_line(aes(y=count_pred, color="trend")) +
+  ggtitle("Airline Passenger Trend") +
+  xlab("Monthly Data") +
+  ylab("Number of Passengers")
+```
+
+## Adjust data using trend
+
+```{r}
+airlines %>%
+  ggplot(aes(x = time, y = count - count_pred)) +
+  geom_line() +
+  ggtitle("Trend Adjusted Passengers") +
+  xlab("Monthly Data") +
+  ylab("Number of Passengers")
+```
+
+
+# Using R ts
+
+```{r}
+library(TTR)
+```
+
+```{r}
+airline_counts <- ts(airlines$count, frequency=12, start=c(1949,1))
+plot(airline_counts)
+```
+
+```{r}
+plot(decompose(airline_counts))
+```
+
+## Seasonally Adjusted
+
+```{r}
+plot(airline_counts - decompose(airline_counts)$seasonal)
+```
+
+```{r}
+airline_forecast <- HoltWinters(airline_counts, beta = FALSE, gamma = FALSE)
+plot(airline_forecast)
+```
+
+```{r}
+airline_forecast$SSE
+```
+
+
+
